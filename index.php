@@ -12,6 +12,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if ($result->num_rows == 1) {
         $_SESSION['admin'] = $user;
         header("Location: dashboard.php");
+        exit();
     } else {
         echo "Identifiants incorrects";
     }

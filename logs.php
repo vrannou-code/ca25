@@ -1,11 +1,39 @@
 <?php
+session_start();
+if (!isset($_SESSION["admin"])) {
+    header("Location: index.php");
+    exit();
+}
+
 include("config.php");
 
-$result = $conn->query("SELECT * FROM Acces_log ORDER BY idAcces DESC");
+$sql = "SELECT * FROM Acces_log ORDER BY idAcces DESC";
+$result = $conn->query($sql);
+?>
 
-echo ">h2>Logs accès</h2>";
+<h2>Logs d'accès</h2>
 
+<table border="1">
+<tr>
+    <th>ID</th>
+    <th>Date</th>
+    <th>Résultat</th>
+    <th>User</th>
+    <th>UID</th>
+</tr>
+
+<?php
 while ($row = $result->fetch_assoc()) {
-    echo $row['UID'] . " - " . $row['Resultat_tentative'] . " - " . $row['Date_heure_entree'] . "<br>";
+    echo "<tr>";
+    echo "<td>".$row["idAcces"]."</td>";
+    echo "<td>".$row["Date_heure_entree"]."</td>";
+    echo "<td>".$row["Resultat_tentative"]."</td>";
+    echo "<td>".$row["idUser"]."</td>";
+    echo "<td>".$row["UID"]."</td>";
 }
 ?>
+
+</table>
+
+<br>
+<a href="dashboard.php">Retour</a>
