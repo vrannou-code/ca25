@@ -11,8 +11,10 @@ include("config.php");
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $uid = $_POST['uid'];
 
-    $sql = "SELECT * FROM Carte WHERE RFID='$uid' AND active=1";
-    $result = $conn->query($sql);
+    $stmt = $conn->prepare("SELECT * FROM Carte WHERE RFID=? AND active=1");
+    $stmt->bind_param("s", $uid);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
     if ($result->num_rows == 1) {
         $row = $result->fetch_assoc();
