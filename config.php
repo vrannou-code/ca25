@@ -10,3 +10,5 @@ if ($conn->connect_error) {
     die("Erreur connexion BDD : " . $conn->connect_error);
 }
 ?>
+
+<link rel="stylesheet" href="style.css">

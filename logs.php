@@ -34,6 +34,8 @@ while ($row = $result->fetch_assoc()) {
 }
 ?>
 
+<img src="img/logo_ca25.png" class="background-logo">
+<link rel="stylesheet" href="style.css">
 </table>
 
 <br>

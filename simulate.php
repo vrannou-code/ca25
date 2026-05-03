@@ -31,6 +31,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 ?>
 
+<img src="img/logo_ca25.png" class="background-logo">
+<link rel="stylesheet" href="style.css">
 <form method="post">
     <h2>Simulation badge</h2>
     <input type="text" name="uid" placeholder="UID RFID">

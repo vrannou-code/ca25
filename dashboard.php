@@ -7,6 +7,9 @@ if (!isset($_SESSION['admin'])) {
 }
 ?>
 
+<link rel="stylesheet" href="style.css">
+<img src="img/logo_ca25.png" class="background-logo">
+
 <h1>Dashboard CA25</h1>
 
 <a href="simulate.php">Simuler badge</a><br>
