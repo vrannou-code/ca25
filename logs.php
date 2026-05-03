@@ -7,8 +7,9 @@ if (!isset($_SESSION["admin"])) {
 
 include("config.php");
 
-$sql = "SELECT * FROM Acces_log ORDER BY idAcces DESC";
-$result = $conn->query($sql);
+$stmt = $conn->prepare("SELECT * FROM Acces_log ORDER BY idAcces DESC");
+$stmt->execute();
+$result = $stmt->get_result();
 ?>
 
 <h2>Logs d'accès</h2>
