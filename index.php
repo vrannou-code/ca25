@@ -6,16 +6,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $user = $_POST['username'];
     $pass = $_POST['password'];
 
-    $sql = "SELECT * FROM User WHERE Identifiant='$user' AND Mdp='$pass' AND SuperUser=1";
+    $sql = "SELECT * FROM User WHERE Identifiant='$user' AND  SuperUser=1";
     $result = $conn->query($sql);
 
     if ($result->num_rows == 1) {
-        $_SESSION['admin'] = $user;
-        header("Location: dashboard.php");
-        exit();
-    } else {
-        echo "Identifiants incorrects";
-    }
+        $row = $result->fetch_assoc();
+
+        if (password_verify($pass, $row['Mdp'])) {
+            $_SESSION['admin'] = $user;
+            header("Location: dashboard.php");
+            exit();
+        } else {
+            echo "Identifiants incorrects";
+        }
+} else {
+    echo "Identifiant incorrects";
+}
 }
 ?>
 
