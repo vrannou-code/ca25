@@ -6,8 +6,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $user = $_POST['username'];
     $pass = $_POST['password'];
 
-    $sql = "SELECT * FROM User WHERE Identifiant='$user' AND  SuperUser=1";
-    $result = $conn->query($sql);
+    $stmt = $conn->prepare("SELECT * FROM User WHERE Identifiant=? AND SuperUser=1");
+    $stmt->bind_param("s", $user);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
     if ($result->num_rows == 1) {
         $row = $result->fetch_assoc();
