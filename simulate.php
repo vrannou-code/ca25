@@ -7,10 +7,12 @@ if (!isset($_SESSION["admin"])) {
 }
 
 include("config.php");
-
+$message = "";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $uid = $_POST['uid'];
-
+    $uid = htmlspecialchars(trim($_POST['uid']));
+if (empty($uid)) {
+    $message = "<p class='error'>Veuillez entrer un UID</p>";
+} else {
     $stmt = $conn->prepare("SELECT * FROM Carte WHERE RFID=? AND active=1");
     $stmt->bind_param("s", $uid);
     $stmt->execute();
@@ -20,21 +22,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $row = $result->fetch_assoc();
         $idUser = $row['idUser'];
 
-        echo "ACCES AUTORISE";
+        $message = "<p class='success'>ACCES AUTORISE</p>";
 
         $conn->query("INSERT INTO Acces_log (Resultat_tentative, idUser, UID) VALUES ('ACCES_OK', $idUser, '$uid')");
     } else {
-        echo "ACCES REFUSE";
+        $message =  "<p class='error'>ACCES REFUSE</p>";
 
         $conn->query("INSERT INTO Acces_log (Resultat_tentative, UID) VALUES ('REFUSE', '$uid')");
     }
 }
+}
 ?>
 
-<img src="img/logo_ca25.png" class="background-logo">
+<div class="container">
 <link rel="stylesheet" href="style.css">
+<img src="img/logo_ca25.png" class="background-logo">
 <form method="post">
     <h2>Simulation badge</h2>
+<?php echo $message; ?>
     <input type="text" name="uid" placeholder="UID RFID">
     <button type="submit">Tester</button>
-</form>>
+</form>
+
+<br><br>
+<a href="dashboard.php" class="btn">Retour</a>
+</div>

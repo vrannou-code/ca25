@@ -15,11 +15,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $row = $result->fetch_assoc();
 
         if (password_verify($pass, $row['Mdp'])) {
+            session_regenerate_id(true);
             $_SESSION['admin'] = $user;
+            $_SESSION['last_activity'] = time();
             header("Location: dashboard.php");
             exit();
         } else {
-            echo "Identifiants incorrects";
+            $error =  "Identifiants incorrects";
         }
 } else {
     echo "Identifiant incorrects";
@@ -29,9 +31,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <img src="img/logo_ca25.png" class="background-logo">
 <link rel="stylesheet" href="style.css">
-<form method="post">
-    <h2>Connexion Admin</h2>
-    <input type="text" name="username" placeholder="Identifiant"><br>
-    <input type="password" name="password" placeholder="Mot de passe"><br>
-    <button type="submit">Se connecter</button>
-</form>
+<div class="login-container">
+
+    <form method="post">
+        <h2>Connexion Admin</h2>
+        <input type="text" name="username" placeholder="Identifiant"><br>
+        <input type="password" name="password" placeholder="Mot de passe"><br>
+        <button type="submit">Se connecter</button>
+    </form>
+</div>

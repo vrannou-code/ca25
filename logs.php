@@ -1,9 +1,19 @@
 <?php
 session_start();
+
 if (!isset($_SESSION["admin"])) {
     header("Location: index.php");
     exit();
 }
+
+if (!isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 600)) {
+     session_unset();
+     session_destroy();
+     header("Location: index.php");
+     exit();
+}
+
+$_SESSION['last_activity'] = time();
 
 include("config.php");
 
@@ -12,9 +22,16 @@ $stmt->execute();
 $result = $stmt->get_result();
 ?>
 
+
+<link rel="stylesheet" href="style.css">
+<img src="img/logo_ca25.png" class="background-logo">
+
+<div class="container">
+
 <h2>Logs d'accès</h2>
 
-<table border="1">
+<table class="table">
+
 <tr>
     <th>ID</th>
     <th>Date</th>
@@ -27,16 +44,20 @@ $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
     echo "<tr>";
     echo "<td>".$row["idAcces"]."</td>";
-    echo "<td>".$row["Date_heure_entree"]."</td>";
-    echo "<td>".$row["Resultat_tentative"]."</td>";
-    echo "<td>".$row["idUser"]."</td>";
-    echo "<td>".$row["UID"]."</td>";
+    echo "<td>".htmlspecialchars($row["Date_heure_entree"])."</td>";
+if ($row['Resultat_tentative'] == "ACCES_OK") {
+    echo "<td class='success'>Accès autorisé</td>";
+} else {
+    echo "<td class='error'>Accès refusé</td>";
+}
+    echo "<td>".htmlspecialchars($row["idUser"])."</td>";
+    echo "<td>".htmlspecialchars($row["UID"])."</td>";
+    echo "</tr>";
 }
 ?>
 
-<img src="img/logo_ca25.png" class="background-logo">
-<link rel="stylesheet" href="style.css">
-</table>
 
+</table>
+</div>
 <br>
 <a href="dashboard.php">Retour</a>
