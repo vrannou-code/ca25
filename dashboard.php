@@ -23,8 +23,10 @@ $_SESSION['last_activity'] = time();
 
 <div class="container">
     <h1>Dashboard CA25</h1>
-
-    <a href="simulate.php" class="btn">Simuler badge</a><br><br>
-    <a href="logs.php" class="btn">Voir logs</a><br><br>
-    <a href="logout.php" class="btn">Déconnexion</a>
+    <div class="button">
+        <a href="simulate.php" class="btn">Simuler badge</a>
+        <a href="logs.php" class="btn">Voir logs</a>
+        <a href="badges.php" class="btn">Gérer badges</a>
+        <a href="logout.php" class="btn">Déconnexion</a><br><br>
+    </div>
 </div>

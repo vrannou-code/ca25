@@ -17,9 +17,46 @@ $_SESSION['last_activity'] = time();
 
 include("config.php");
 
-$stmt = $conn->prepare("SELECT * FROM Acces_log ORDER BY idAcces DESC");
+$where = [];
+$params = [];
+$types = "";
+
+if (isset($_GET["filtre"]) && $_GET["filtre"] != "") {
+    if ($_GET["filtre"] == "ok") {
+        $where[] = "Acces_log.Resultat_tentative = ?";
+        $params[] = "ACCES_OK";
+        $types .= "s";
+    } elseif ($_GET["filtre"] == "refus") {
+        $where[] = "Acces_log.Resultat_tentative != ?";
+        $params[] = "ACCES_OK";
+        $types .= "s";
+    }
+}
+
+if (isset($_GET["user"]) && $_GET["user"] != "") {
+    $where[] = "Acces_log.idUser = ?";
+    $params[] = intval($_GET["user"]);
+    $types .= "i";
+}
+
+$whereSQL = "";
+if (count($where) > 0) {
+    $whereSQL = "WHERE " . implode("AND ", $where);
+}
+
+$sql = "SELECT Acces_log.*, User.Nom, User.Prenom FROM Acces_log LEFT JOIN User ON Acces_log.idUser = User.idUser
+        $whereSQL ORDER BY Acces_log.Date_heure_entree DESC";
+
+$stmt = $conn->prepare($sql);
+
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
+
 $stmt->execute();
 $result = $stmt->get_result();
+
+$users = $conn->query("SELECT idUser, Nom, Prenom FROM User ORDER BY Nom");
 ?>
 
 
@@ -30,27 +67,58 @@ $result = $stmt->get_result();
 
 <h2>Logs d'accès</h2>
 
+<form method="get">
+    <select name="filtre">
+        <option value="">Tous</option>
+        <option value="ok">Accès autorisé</option>
+        <option value="refus">Accès refusé</option>
+    </select>
+
+    <select name="user">
+        <option value="">Tous les utilisateurs</option>
+        <?php while ($user = $users->fetch_assoc()) { ?>
+            <option value="<?php echo htmlspecialchars($user["idUser"]); ?>">
+                <?php echo htmlspecialchars($user["Nom"] . " " .$user["Prenom"]); ?>
+            </option>
+        <?php } ?>
+    </select>
+
+    <button type="submit">Filtrer</button>
+</form>
+
+<br>
+
 <table class="table">
 
 <tr>
     <th>ID</th>
     <th>Date</th>
     <th>Résultat</th>
-    <th>User</th>
+    <th>Utilisateur</th>
     <th>UID</th>
 </tr>
 
 <?php
 while ($row = $result->fetch_assoc()) {
     echo "<tr>";
-    echo "<td>".$row["idAcces"]."</td>";
+    echo "<td>".htmlspecialchars($row["idAcces"])."</td>";
     echo "<td>".htmlspecialchars($row["Date_heure_entree"])."</td>";
-if ($row['Resultat_tentative'] == "ACCES_OK") {
+
+    if ($row['Resultat_tentative'] == "ACCES_OK") {
     echo "<td class='success'>Accès autorisé</td>";
-} else {
+    } elseif ($row['Resultat_tentative'] == "BADGE_INACTIF") {
+    echo "<td class='warning'>Badge inactif</td>";
+    } elseif ($row['Resultat_tentative'] == "BADGE INCONNU") {
+    echo "<td class='error'>Badge inconnu</td>";
+    } else {
     echo "<td class='error'>Accès refusé</td>";
-}
-    echo "<td>".htmlspecialchars($row["idUser"])."</td>";
+    }
+
+    if ($row['Nom'] && $row['Prenom']) {
+    echo "<td>".htmlspecialchars($row['Nom']." ".$row['Prenom'])."</td>";
+    } else {
+    echo "<td>Badge inconnu</td>";
+    }
     echo "<td>".htmlspecialchars($row["UID"])."</td>";
     echo "</tr>";
 }
