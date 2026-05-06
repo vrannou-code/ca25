@@ -126,6 +126,10 @@ while ($row = $result->fetch_assoc()) {
 
 
 </table>
-</div>
 <br>
-<a href="dashboard.php">Retour</a>
+<a href="dashboard.php" class="btn retour">Retour</a>
+</div>
+<footer>
+    <p>CA25 - Application de gestion des badges RFID</p>
+    <p>BTS CIEL - Virginie R.</p>
+</footer>

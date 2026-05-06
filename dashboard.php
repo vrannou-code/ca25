@@ -30,3 +30,8 @@ $_SESSION['last_activity'] = time();
         <a href="logout.php" class="btn">Déconnexion</a><br><br>
     </div>
 </div>
+
+<footer>
+    <p>CA25 - Application de gestion des badges RFID</p>
+    <p>BTS CIEL - Virginie R.</p>
+</footer>

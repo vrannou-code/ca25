@@ -203,5 +203,10 @@ $result = $conn->query("SELECT Carte.*, User.Nom, User.Prenom FROM Carte LEFT JO
 
 </table>
 <br>
-<a href="dashboard.php">Retour</a>
+<a href="dashboard.php" class="btn retour">Retour</a>
 </div>
+
+<footer>
+    <p>CA25 - Application de gestion des badges RFID</p>
+    <p>BTS CIEL - Virginie R.</p>
+</footer>
