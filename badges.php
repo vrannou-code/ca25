@@ -54,7 +54,7 @@ if (isset($_GET['toggle'])) {
 }
 
 $users = $conn->query("SELECT idUser, Nom, Prenom FROM User ORDER BY Nom");
-
+$usersTable = $conn->query("SELECT idUser, Nom, Prenom FROM User ORDER BY Nom");
 // Suppression badge
 if (isset($_GET["delete"])) {
     $id = intval($_GET["delete"]);
@@ -69,6 +69,24 @@ if (isset($_GET["delete"])) {
     exit();
 }
 
+// Suppression utilisateur
+if (isset($_GET['deleteuser'])) {
+
+    $id = intval($_GET['deleteuser']);
+
+    // Supprime les badges liés
+    $stmt = $conn->prepare("DELETE FROM Carte WHERE idUser = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+
+    // Supprime utilisateur
+    $stmt = $conn->prepare("DELETE FROM User WHERE idUser = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+
+    header("Location: badges.php");
+    exit();
+}
 
 
 // Récupération badges
@@ -105,7 +123,7 @@ $result = $conn->query("SELECT Carte.*, User.Nom, User.Prenom FROM Carte LEFT JO
 </form>
 <br>
 
-<table border="1">
+<table class="table">
 <tr>
     <th>ID</th>
     <th>RFID</th>
@@ -160,6 +178,30 @@ $result = $conn->query("SELECT Carte.*, User.Nom, User.Prenom FROM Carte LEFT JO
 
 </table>
 
+<h3>Liste des utilisateurs</h3>
+
+<table class="table">
+    <tr>
+        <th>ID</th>
+        <th>Nom</th>
+        <th>Prénom</th>
+        <th>Action</th>
+    </tr>
+
+<?php while($u = $usersTable->fetch_assoc()) { ?>
+
+<tr>
+    <td><?= $u['idUser'] ?></td>
+    <td><?= $u['Nom'] ?></td>
+    <td><?= $u['Prenom'] ?></td>
+    <td><a href="badges.php?deleteuser=<?= $u['idUser'] ?>"onclick="return confirm('Supprimer cet utilisateur ?')">Supprimer
+        </a>
+    </td>
+</tr>
+
+<?php } ?>
+
+</table>
 <br>
 <a href="dashboard.php">Retour</a>
 </div>

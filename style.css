@@ -59,9 +59,10 @@ input {
 }
 
 .table {
-    width: 100%;
+    width: auto;
     border-collapse: collapse;
-    margin-top: 20px;
+    margin-top: 20px auto;
+    background: rgba(255, 255, 255, 0.85);
 }
 
 .table th {
@@ -71,7 +72,7 @@ input {
 }
 
 .table td {
-    padding: 8px;
+    padding: 8px 12px;
     border-bottom: 1px solid #ddd;
 }
 
@@ -156,3 +157,4 @@ h1::after, h2::after {
     background-color: #007BFF;
     margin: 10px auto 0;
     border-radius: 2px;
+
