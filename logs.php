@@ -1,11 +1,13 @@
 <?php
 session_start();
 
+// Vérification session admin
 if (!isset($_SESSION["admin"])) {
     header("Location: index.php");
     exit();
 }
 
+// Expiration automatique de la session
 if (!isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 600)) {
      session_unset();
      session_destroy();
@@ -17,6 +19,7 @@ $_SESSION['last_activity'] = time();
 
 include("config.php");
 
+// Préparation des filtres
 $where = [];
 $params = [];
 $types = "";
@@ -44,6 +47,7 @@ if (count($where) > 0) {
     $whereSQL = "WHERE " . implode("AND ", $where);
 }
 
+// Récupération des logs d'accès
 $sql = "SELECT Acces_log.*, User.Nom, User.Prenom FROM Acces_log LEFT JOIN User ON Acces_log.idUser = User.idUser
         $whereSQL ORDER BY Acces_log.Date_heure_entree DESC";
 
@@ -56,6 +60,7 @@ if (!empty($params)) {
 $stmt->execute();
 $result = $stmt->get_result();
 
+// Récupération des utilisateurs pour le filtre
 $users = $conn->query("SELECT idUser, Nom, Prenom FROM User ORDER BY Nom");
 ?>
 

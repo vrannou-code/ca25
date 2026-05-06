@@ -11,18 +11,30 @@ if (!isset($_SESSION['admin'])) {
 if (isset($_POST["add_user"])) {
     $nom = trim($_POST["nom"]);
     $prenom = trim($_POST["prenom"]);
+    $email = trim($_POST["email"]);
 
     if ($nom != "" && $prenom != "") {
-        $stmt = $conn->prepare("INSERT INTO User (Nom, Prenom, SuperUser) VALUES (?, ?, 0)");
-        $stmt->bind_param("ss", $nom, $prenom);
-        $stmt->execute();
 
-       header("Location: badges.php");
-       exit();
+        $check = $conn->prepare("SELECT idUser FROM User WHERE Nom = ? AND Prenom = ?");
+        $check->bind_param("ss", $nom, $prenom);
+        $check->execute();
+        $checkResult = $check->get_result();
+
+        if ($checkResult->num_rows > 0) {
+            $message = "<p class='error'>Cet utilisateur existe déjà</p>";
+        } else {
+
+            $stmt = $conn->prepare("INSERT INTO User (Nom, Prenom, Email, Motf, SuperUser) VALUES (?, ?, ?, '', 0)");
+            $stmt->bind_param("sss", $nom, $prenom, $email);
+            $stmt->execute();
+
+            header("Location: badges.php");
+            exit();
+        }
     }
 }
 
-
+// Ajout badges
 if (isset($_POST["add_badge"])) {
     $rfid = $_POST["rfid"];
     $idUser = intval($_POST["idUser"]);
@@ -55,6 +67,7 @@ if (isset($_GET['toggle'])) {
 
 $users = $conn->query("SELECT idUser, Nom, Prenom FROM User ORDER BY Nom");
 $usersTable = $conn->query("SELECT idUser, Nom, Prenom FROM User ORDER BY Nom");
+
 // Suppression badge
 if (isset($_GET["delete"])) {
     $id = intval($_GET["delete"]);
@@ -93,7 +106,16 @@ if (isset($_GET['deleteuser'])) {
 $result = $conn->query("SELECT Carte.*, User.Nom, User.Prenom FROM Carte LEFT JOIN User ON Carte.idUser = User.idUser");
 ?>
 
-<link rel="stylesheet" href="style.css">
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des badges</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
 <img src="img/logo_ca25.png" class="background-logo">
 <div class="container">
 
@@ -119,7 +141,8 @@ $result = $conn->query("SELECT Carte.*, User.Nom, User.Prenom FROM Carte LEFT JO
 <form method="post">
     <input type="text" name="nom" placeholder="Nom" required>
     <input type="text" name="prenom" placeholder="Prénom" required>
-    <button type="submi" name="add_user">Ajouter</button>
+    <input type="email" name="email" placeholder="Email" required>
+    <button type="submit" name="add_user">Ajouter</button>
 </form>
 <br>
 
@@ -150,27 +173,19 @@ $result = $conn->query("SELECT Carte.*, User.Nom, User.Prenom FROM Carte LEFT JO
 
     <td>
         <?php
-        if ($row["active"] == 1) {
-            echo "Actif";
-        } else {
-            echo "Inactif";
-        }
+        echo ($row["active"] == 1) ? "Actif" : "Inactif";
         ?>
     </td>
 
     <td>
         <?php
         $lien = "badges.php?toggle=" . $row['idCarte'];
-        if ($row["active"] == 1) {
-            echo "<a href='$lien'>Désactiver</a>";
-        } else {
-            echo "<a href='$lien'>Activer</a>";
-        }
+        echo ($row["active"] == 1) ?  "<a href='$lien'>Désactiver</a>" : "<a href='$lien'>Activer</a>";
         ?>
     </td>
 
     <td>
-        <a href="badges.php?delete=<?php echo $row["idCarte"]; ?>" onclick="return confirm('Supprimer ce badge ?');">Supprimer
+        <a href="badges.php?delete=<?= $row["idCarte"] ?>"onclick="return confirm('Supprimer ce badge ?');">Supprimer
         </a>
     </td>
 </tr>
@@ -191,10 +206,10 @@ $result = $conn->query("SELECT Carte.*, User.Nom, User.Prenom FROM Carte LEFT JO
 <?php while($u = $usersTable->fetch_assoc()) { ?>
 
 <tr>
-    <td><?= $u['idUser'] ?></td>
-    <td><?= $u['Nom'] ?></td>
-    <td><?= $u['Prenom'] ?></td>
-    <td><a href="badges.php?deleteuser=<?= $u['idUser'] ?>"onclick="return confirm('Supprimer cet utilisateur ?')">Supprimer
+    <td><?= htmlspecialchars($u['idUser']) ?></td>
+    <td><?= htmlspecialchars($u['Nom']) ?></td>
+    <td><?= htmlspecialchars($u['Prenom']) ?></td>
+    <td><a href="badges.php?deleteuser=<?= $u['idUser'] ?>"onclick="return confirm('Supprimer cet utilisateur et ses badges associés ?')">Supprimer
         </a>
     </td>
 </tr>
@@ -210,3 +225,6 @@ $result = $conn->query("SELECT Carte.*, User.Nom, User.Prenom FROM Carte LEFT JO
     <p>CA25 - Application de gestion des badges RFID</p>
     <p>BTS CIEL - Virginie R.</p>
 </footer>
+
+</body>
+</html>

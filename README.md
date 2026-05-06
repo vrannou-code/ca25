@@ -1,7 +1,7 @@
 # CA25 - Gestion des badges
 
 ## Description
-Application web en PHP permettant de gérer des badges RFID.
+Application web en PHP de gestion de badges RFID.
 
 Projet réalisé dans le cadre du BTS CIEL (option IR).
 
@@ -23,16 +23,16 @@ Objectif : gérer les accès via badges RFID avec suivi des logs d’accès.
 ## Technologies utilisées
 
 - PHP
-- MySQL
+- MariaDB/MySQL
 - HTML / CSS
 
 ---
 
 ## Installation
 
-1. Installer un serveur web (Apache ou Nginx)
+1. Installer Apache
 2. Installer PHP
-3. Installer MySQL
+3. Installer MariaDB/MySQL
 4. Importer la base de données
 5. Placer les fichiers dans `/var/www/html/`
 6. Accéder à l’application via navigateur
@@ -45,6 +45,7 @@ Objectif : gérer les accès via badges RFID avec suivi des logs d’accès.
 - Protection des pages admin
 - Requêtes SQL préparées (anti-injection)
 - Timeout de session
+- Chiffrement des échanges via HTTPS
 
 ---
 

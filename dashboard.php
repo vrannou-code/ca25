@@ -2,11 +2,13 @@
 session_start();
 include("config.php");
 
+//Vérification session admin
 if (!isset($_SESSION['admin'])) {
     header("Location: index.php");
     exit();
 }
 
+// Expiration automatique session
 if (!isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > 600)) {
      session_unset();
      session_destroy();
@@ -23,11 +25,12 @@ $_SESSION['last_activity'] = time();
 
 <div class="container">
     <h1>Dashboard CA25</h1>
-    <div class="button">
+    <h3>Menu principal</h3>
+    <div class="buttons">
         <a href="simulate.php" class="btn">Simuler badge</a>
         <a href="logs.php" class="btn">Voir logs</a>
         <a href="badges.php" class="btn">Gérer badges</a>
-        <a href="logout.php" class="btn">Déconnexion</a><br><br>
+        <a href="logout.php" class="btn">Déconnexion</a>
     </div>
 </div>
 
