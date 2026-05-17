@@ -1,4 +1,16 @@
 <?php
+
+// ======================================================
+// SIMULATION D'UN PASSAGE DE BADGE RFID
+// Projet CA25 - Gestion des badges RFID
+// BTS CIEL - Virginie R.
+// ======================================================
+
+
+// ======================================================
+// CONFIGURATION DE LA SESSION
+// ======================================================
+
 session_name("CA25SESSID");
 
 session_set_cookie_params([
@@ -6,91 +18,173 @@ session_set_cookie_params([
     'path' => '/',
     'secure' => true,
     'httponly' => true,
-    'samesite'=> 'Strict'
+    'samesite' => 'Strict'
 ]);
 
 session_start();
 
-// Vérification session admin
-if (!isset($_SESSION["admin"])) {
+include("config.php");
+include("csrf.php");
+
+
+// ======================================================
+// CONTRÔLE D'ACCÈS
+// ======================================================
+
+if (!isset($_SESSION['admin'])) {
     header("Location: index.php");
     exit();
 }
 
-include("config.php");
-include("csrf.php");
+
+// ======================================================
+// INITIALISATION
+// ======================================================
+
 $message = "";
 
-// Simulation d'un passage de badge RFID
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
-    die("Erreur CSRF : requête non autorisée.");
-}
-    $uid = htmlspecialchars(trim($_POST['uid']));
-if (empty($uid)) {
-    $message = "<p class='error'>Veuillez entrer un UID</p>";
-} else {
 
-// Recherche d'un badge dans la base
-    $stmt = $conn->prepare("SELECT * FROM Carte WHERE RFID=?");
-    $stmt->bind_param("s", $uid);
-    $stmt->execute();
-    $result = $stmt->get_result();
+// ======================================================
+// TRAITEMENT DE LA SIMULATION
+// ======================================================
 
-    if ($result->num_rows == 1) {
-        $row = $result->fetch_assoc();
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-// Vérification si le badge est actif
-        if ($row['active'] == 1) {
-            $idUser = $row['idUser'];
-            $message = "<p class='success'>ACCES AUTORISE</p>";
+    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
+        die("Erreur CSRF : requête non autorisée.");
+    }
 
+    $uid = trim(htmlspecialchars($_POST['uid'] ?? ''));
 
-// Enregistrement du résultat dans les logs
-            $stmtLog = $conn->prepare("INSERT INTO Acces_log (Resultat_tentative, idUser, UID) Values (?, ?, ?)");
-            $resultat = "ACCES_OK";
-            $stmtLog->bind_param("sis", $resultat, $idUser, $uid);
+    if (empty($uid)) {
+
+        $message = "<p class='error'>Veuillez entrer un UID.</p>";
+
+    } else {
+
+        // Recherche du badge RFID dans la base
+        $stmtBadge = $conn->prepare("
+            SELECT *
+            FROM Carte
+            WHERE RFID = ?
+        ");
+
+        $stmtBadge->bind_param("s", $uid);
+        $stmtBadge->execute();
+
+        $result = $stmtBadge->get_result();
+
+        if ($result->num_rows === 1) {
+
+            $badge = $result->fetch_assoc();
+
+            // Cas 1 : badge connu et actif
+            if ($badge['active'] == 1) {
+
+                $idUser = $badge['idUser'];
+                $resultat = "ACCES_OK";
+
+                $message = "<p class='success'>ACCÈS AUTORISÉ</p>";
+
+                $stmtLog = $conn->prepare("
+                    INSERT INTO Acces_log (Resultat_tentative, idUser, UID)
+                    VALUES (?, ?, ?)
+                ");
+
+                $stmtLog->bind_param("sis", $resultat, $idUser, $uid);
+                $stmtLog->execute();
+
+            } else {
+
+                // Cas 2 : badge connu mais inactif
+                $idUser = $badge['idUser'];
+                $resultat = "BADGE_INACTIF";
+
+                $message = "<p class='warning'>BADGE INACTIF</p>";
+
+                $stmtLog = $conn->prepare("
+                    INSERT INTO Acces_log (Resultat_tentative, idUser, UID)
+                    VALUES (?, ?, ?)
+                ");
+
+                $stmtLog->bind_param("sis", $resultat, $idUser, $uid);
+                $stmtLog->execute();
+            }
+
+        } else {
+
+            // Cas 3 : badge inconnu
+            $resultat = "BADGE_INCONNU";
+
+            $message = "<p class='error'>ACCÈS REFUSÉ</p>";
+
+            $stmtLog = $conn->prepare("
+                INSERT INTO Acces_log (Resultat_tentative, UID)
+                VALUES (?, ?)
+            ");
+
+            $stmtLog->bind_param("ss", $resultat, $uid);
             $stmtLog->execute();
-    } else {
-        $message =  "<p class='warning'>BADGE INACTIF</p>";
-        $idUser = $row['idUser'];
-        $stmtLog = $conn->prepare("INSERT INTO Acces_log (Resultat_tentative, idUser, UID) VALUES (?, ?, ?)");
-        $resultat = "BADGE_INACTIF";
-        $stmtLog->bind_param("sis", $resultat, $idUser, $uid);
-        $stmtLog->execute();
-    }
-    } else {
-        $message = "<p class='error'>ACCES REFUSE</p>";
-        $stmtLog = $conn->prepare("INSERT INTO Acces_log (Resultat_tentative, UID) VALUES (?, ?)");
-        $resultat = "BADGE_INCONNU";
-        $stmtLog->bind_param("ss", $resultat, $uid);
-        $stmtLog->execute();
-    }
+        }
     }
 }
 
-// Interface simulation
 ?>
-<link rel="stylesheet" href="style.css">
-<div class="container">
+<!DOCTYPE html>
+<html lang="fr">
 
-<img src="img/logo_ca25.png" class="background-logo">
-<form method="post">
-<input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+<head>
+    <meta charset="UTF-8">
+    <title>Logs CA25</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="login-container">
+
+    <img src="img/logo_ca25.png" class="background-logo">
+
     <h1>Simulation badge</h1>
+
     <?php echo $message; ?>
+
+    <!-- Formulaire de simulation RFID -->
+<form method="post">
+
+    <input
+        type="hidden"
+        name="csrf_token"
+        value="<?php echo generate_csrf_token(); ?>"
+    >
+
     <div class="simulate-form">
-        <input type="text" name="uid" placeholder="UID RFID">
-        <button type="submit">Tester</button>
+
+        <input
+            type="text"
+            name="uid"
+            placeholder="UID RFID"
+        >
+
+        <button type="submit">
+            Tester
+        </button>
+
     </div>
+
 </form>
 
-<a href="dashboard.php" class="btn retour">Retour</a>
-
+    <!-- Bouton de retour au tableau de bord -->
+    <a href="dashboard.php" class="btn retour">
+        Retour
+    </a>
 
 </div>
 
 <footer>
-CA25 - Application de gestion des badges RFID<br>
-BTS CIEL - Virginie R.
+    CA25 - Application de gestion des badges RFID<br>
+    BTS CIEL - Virginie R.
 </footer>
+
+</body>
+</html>

@@ -1,4 +1,8 @@
 <?php
+// =====================================================
+// CONFIGURATION DE LA SESSION
+// =====================================================
+
 session_name("CA25SESSID");
 
 session_set_cookie_params([
@@ -10,8 +14,14 @@ session_set_cookie_params([
 ]);
 
 session_start();
+
 include("config.php");
 include("csrf.php");
+
+
+// =====================================================
+// CONTRÔLE D'ACCÈS
+// =====================================================
 
 if (!isset($_SESSION['admin'])) {
     header("Location: index.php");
@@ -23,45 +33,74 @@ if ($_SESSION['role'] != 1) {
     exit();
 }
 
-// Ajout utilisateur
-if (isset($_POST["add_user"])) {
 
-    if (!verify_csrf_token($_POST['csrf_token'] ??'')) {
+// =====================================================
+// FONCTION DE JOURNALISATION ADMINISTRATEUR
+// =====================================================
+
+function logAdmin($conn, $action)
+{
+    $admin = $_SESSION['admin'];
+
+    $stmtLog = $conn->prepare("
+        INSERT INTO Admin_log (admin, action)
+        VALUES (?, ?)
+    ");
+
+    $stmtLog->bind_param("ss", $admin, $action);
+    $stmtLog->execute();
+}
+
+
+// =====================================================
+// AJOUT D'UN UTILISATEUR
+// =====================================================
+
+if (isset($_POST['add_user'])) {
+
+    if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
         die("Erreur CSRF : requête non autorisée.");
     }
 
-    $nom = trim($_POST["nom"]);
-    $prenom = trim($_POST["prenom"]);
-    $email = trim($_POST["email"]);
+    $nom = trim($_POST['nom']);
+    $prenom = trim($_POST['prenom']);
+    $email = trim($_POST['email']);
 
-    if ($nom != "" && $prenom != "") {
+    if ($nom !== "" && $prenom !== "") {
 
-        $check = $conn->prepare("SELECT idUser FROM User WHERE Nom = ? AND Prenom = ?");
-        $check->bind_param("ss", $nom, $prenom);
-        $check->execute();
-        $checkResult = $check->get_result();
+        $stmtCheck = $conn->prepare("
+            SELECT idUser
+            FROM User
+            WHERE Nom = ?
+              AND Prenom = ?
+        ");
 
-        if ($checkResult->num_rows > 0) {
-            $message = "<p class='error'>Cet utilisateur existe déjà</p>";
-        } else {
+        $stmtCheck->bind_param("ss", $nom, $prenom);
+        $stmtCheck->execute();
+        $checkResult = $stmtCheck->get_result();
 
-            $stmt = $conn->prepare("INSERT INTO User (Nom, Prenom, Email, Motf, SuperUser) VALUES (?, ?, ?, '', 0)");
-            $stmt->bind_param("sss", $nom, $prenom, $email);
-            $stmt->execute();
+        if ($checkResult->num_rows == 0) {
 
-            $admin = $_SESSION['admin'];
-            $action = "Ajout utilisateur : " . $nom . " " . $prenom;
-            $log = $conn->prepare("INSERT INTO Admin_log (admin, action) VALUES (?, ?)");
-            $log->bind_param("ss", $admin, $action);
-            $log->execute();
+            $stmtInsert = $conn->prepare("
+                INSERT INTO User (Nom, Prenom, Email, Motf, SuperUser)
+                VALUES (?, ?, ?, '', 0)
+            ");
 
-            header("Location: badges.php");
-            exit();
+            $stmtInsert->bind_param("sss", $nom, $prenom, $email);
+            $stmtInsert->execute();
+
+            logAdmin($conn, "Ajout utilisateur : " . $nom . " " . $prenom);
         }
     }
+
+    header("Location: badges.php");
+    exit();
 }
 
-//Création compte applicatif
+
+// =====================================================
+// CRÉATION D'UN COMPTE APPLICATIF
+// =====================================================
 
 if (isset($_POST['add_account'])) {
 
@@ -74,33 +113,50 @@ if (isset($_POST['add_account'])) {
     $password = trim($_POST['password']);
     $role = intval($_POST['role']);
 
-    if ($idUser > 0 && $identifiant != "" && $password != "") {
-        $check = $conn->prepare("SELECT idUser FROM User WHERE Identifiant = ? OR (idUser = ? AND Identifiant IS NOT NULL)");
-        $check->bind_param("si", $identifiant, $idUser);
-        $check->execute();
-        $checkResult = $check->get_result();
+    if ($idUser > 0 && $identifiant !== "" && $password !== "") {
 
-        if ($checkResult->num_rows > 0) {
-            $message = "<p class='error'>Cet identifiant existe déjà</p>";
-        } else {
+        $stmtCheck = $conn->prepare("
+            SELECT idUser
+            FROM User
+            WHERE Identifiant = ?
+               OR (idUser = ? AND Identifiant IS NOT NULL)
+        ");
+
+        $stmtCheck->bind_param("si", $identifiant, $idUser);
+        $stmtCheck->execute();
+        $checkResult = $stmtCheck->get_result();
+
+        if ($checkResult->num_rows == 0) {
+
             $hash = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("UPDATE User SET Identifiant = ?, Motf = ?, SuperUser = ? WHERE idUser = ?");
-            $stmt->bind_param("ssii", $identifiant, $hash, $role, $idUser);
-            $stmt->execute();
 
-            $admin = $_SESSION['admin'];
-            $action = "Création compte applicatif : " . $identifiant . " (ID utilisateur " . $idUser . ")";
-            $log = $conn->prepare("INSERT INTO Admin_log (admin, action) VALUES (?, ?)");
-            $log->bind_param("ss", $admin, $action);
-            $log->execute();
+            $stmtUpdate = $conn->prepare("
+                UPDATE User
+                SET Identifiant = ?,
+                    Motf = ?,
+                    SuperUser = ?
+                WHERE idUser = ?
+            ");
 
-            header("Location: badges.php");
-            exit();
+            $stmtUpdate->bind_param("ssii", $identifiant, $hash, $role, $idUser);
+            $stmtUpdate->execute();
+
+            logAdmin(
+                $conn,
+                "Création compte applicatif : " . $identifiant . " (ID utilisateur " . $idUser . ")"
+            );
         }
     }
+
+    header("Location: badges.php");
+    exit();
 }
 
-// Modification rôle compte applicatif
+
+// =====================================================
+// MODIFICATION DU RÔLE D'UN COMPTE
+// =====================================================
+
 if (isset($_POST['update_role'])) {
 
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
@@ -110,22 +166,30 @@ if (isset($_POST['update_role'])) {
     $idUser = intval($_POST['idUser']);
     $role = intval($_POST['role']);
 
-    $stmt = $conn->prepare("UPDATE User SET SuperUser = ? WHERE idUser = ?");
-    $stmt->bind_param("ii", $role, $idUser);
-    $stmt->execute();
+    $stmtUpdate = $conn->prepare("
+        UPDATE User
+        SET SuperUser = ?
+        WHERE idUser = ?
+    ");
 
-    $admin = $_SESSION['admin'];
+    $stmtUpdate->bind_param("ii", $role, $idUser);
+    $stmtUpdate->execute();
 
-    $userInfo = $conn->prepare("SELECT Nom, Prenom FROM User WHERE idUser = ?");
-    $userInfo->bind_param("i", $idUser);
-    $userInfo->execute();
-    $userResult = $userInfo->get_result();
-    $userRow = $userResult->fetch_assoc();
-    $action = "Modification rôle : " . $userRow['Nom'] . " " . $userRow['Prenom'] . " (ID " . $idUser . ")";
+    $stmtUser = $conn->prepare("
+        SELECT Nom, Prenom
+        FROM User
+        WHERE idUser = ?
+    ");
 
-    $log = $conn->prepare("INSERT INTO Admin_log (admin, action) VALUES (?, ?)");
-    $log->bind_param("ss", $admin, $action);
-    $log->execute();
+    $stmtUser->bind_param("i", $idUser);
+    $stmtUser->execute();
+    $userResult = $stmtUser->get_result();
+    $user = $userResult->fetch_assoc();
+
+    logAdmin(
+        $conn,
+        "Modification rôle : " . $user['Nom'] . " " . $user['Prenom'] . " (ID " . $idUser . ")"
+    );
 
     $_SESSION['message'] = "<p class='success'>Rôle modifié avec succès</p>";
 
@@ -133,351 +197,454 @@ if (isset($_POST['update_role'])) {
     exit();
 }
 
-// Ajout badges
-if (isset($_POST["add_badge"])) {
+
+// =====================================================
+// AJOUT D'UN BADGE RFID
+// =====================================================
+
+if (isset($_POST['add_badge'])) {
 
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
         die("Erreur CSRF : requête non autorisée.");
     }
 
-    $rfid = trim(htmlspecialchars($_POST["rfid"]));
-    $idUser = intval($_POST["idUser"]);
+    $rfid = trim(htmlspecialchars($_POST['rfid']));
+    $idUser = intval($_POST['idUser']);
 
-    $check = $conn->prepare("SELECT idCarte FROM Carte WHERE RFID = ?");
-    $check->bind_param("s", $rfid);
-    $check->execute();
-    $checkResult = $check->get_result();
+    if ($rfid !== "" && $idUser > 0) {
 
-    if ($checkResult->num_rows > 0) {
-        $message = "<p class='error'>Ce badge existe déjà</p>";
-    } else {
-    $stmt = $conn->prepare("INSERT INTO Carte (RFID, idUser, active) VALUES (?, ?, 1)");
-    $stmt->bind_param("si", $rfid, $idUser);
-    $stmt->execute();
+        $stmtCheck = $conn->prepare("
+            SELECT idCarte
+            FROM Carte
+            WHERE RFID = ?
+        ");
 
-    $admin = $_SESSION['admin'];
-    $action = "Ajout badge RFID : " . $rfid;
-    $log = $conn->prepare("INSERT INTO Admin_log (admin, action) VALUES (?, ?)");
-    $log->bind_param("ss", $admin, $action);
-    $log->execute();
+        $stmtCheck->bind_param("s", $rfid);
+        $stmtCheck->execute();
+        $checkResult = $stmtCheck->get_result();
 
-    header("Location: badges.php");
-    exit();
+        if ($checkResult->num_rows == 0) {
+
+            $stmtInsert = $conn->prepare("
+                INSERT INTO Carte (RFID, idUser, active)
+                VALUES (?, ?, 1)
+            ");
+
+            $stmtInsert->bind_param("si", $rfid, $idUser);
+            $stmtInsert->execute();
+
+            logAdmin($conn, "Ajout badge RFID : " . $rfid);
+        }
     }
-}
-
-
-// Toggle actif / inactif
-if (isset($_GET['toggle'])) {
-    $id = intval($_GET['toggle']);
-    $badgeInfo = $conn->prepare("SELECT RFID FROM Carte WHERE idCarte = ?");
-    $badgeInfo->bind_param("i", $id);
-    $badgeInfo->execute();
-    $badgeResult = $badgeInfo->get_result();
-    $badgeRow = $badgeResult->fetch_assoc();
-    $stmt = $conn->prepare("UPDATE Carte SET active = 1 - active WHERE idCarte = ?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-
-    $admin =$_SESSION['admin'];
-
-    $check = $conn->prepare("SELECT active FROM Carte WHERE idCarte = ?");
-    $check->bind_param("i", $id);
-    $check->execute();
-    $resultCheck = $check->get_result();
-    $rowCheck = $resultCheck->fetch_assoc();
-
-    $etat = ($rowCheck['active'] == 1) ? "Activation" : "Désactivation";
-
-    $admin = $_SESSION['admin'];
-    $action = $etat . " badge : " . $badgeRow['RFID'] . " (ID " . $id . ")";
-
-    $log = $conn->prepare("INSERT INTO Admin_log (admin, action) VALUES (?, ?)");
-    $log->bind_param("ss", $admin, $action);
-    $log->execute();
 
     header("Location: badges.php");
     exit();
 }
 
-$users = $conn->query("SELECT idUser, Nom, Prenom FROM User ORDER BY Nom");
-$usersTable = $conn->query("SELECT idUser, Nom, Prenom, Identifiant, SuperUser FROM User ORDER BY Nom");
 
-// Suppression badge
-if (isset($_GET["delete"])) {
-    $id = intval($_GET["delete"]);
-    if ($id <= 0) {
+// =====================================================
+// ACTIVATION / DÉSACTIVATION D'UN BADGE
+// =====================================================
+
+if (isset($_GET['toggle'])) {
+
+    $idCarte = intval($_GET['toggle']);
+
+    $stmtBadge = $conn->prepare("
+        SELECT RFID, active
+        FROM Carte
+        WHERE idCarte = ?
+    ");
+
+    $stmtBadge->bind_param("i", $idCarte);
+    $stmtBadge->execute();
+    $badgeResult = $stmtBadge->get_result();
+    $badge = $badgeResult->fetch_assoc();
+
+    if ($badge) {
+
+        $stmtUpdate = $conn->prepare("
+            UPDATE Carte
+            SET active = 1 - active
+            WHERE idCarte = ?
+        ");
+
+        $stmtUpdate->bind_param("i", $idCarte);
+        $stmtUpdate->execute();
+
+        $newStatus = ($badge['active'] == 1) ? "Désactivation" : "Activation";
+
+        logAdmin(
+            $conn,
+            $newStatus . " badge : " . $badge['RFID'] . " (ID " . $idCarte . ")"
+        );
+    }
+
+    header("Location: badges.php");
+    exit();
+}
+
+
+// =====================================================
+// SUPPRESSION D'UN BADGE
+// =====================================================
+
+if (isset($_GET['delete'])) {
+
+    $idCarte = intval($_GET['delete']);
+
+    if ($idCarte <= 0) {
         exit("ID invalide");
     }
 
-    $badgeInfo = $conn->prepare("SELECT RFID FROM Carte WHERE idCarte = ?");
-    $badgeInfo->bind_param("i", $id);
-    $badgeInfo->execute();
-    $badgeResult = $badgeInfo->get_result();
-    $badgeRow = $badgeResult->fetch_assoc();
+    $stmtBadge = $conn->prepare("
+        SELECT RFID
+        FROM Carte
+        WHERE idCarte = ?
+    ");
 
-    $stmt = $conn->prepare("DELETE FROM Carte WHERE idCarte = ?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
+    $stmtBadge->bind_param("i", $idCarte);
+    $stmtBadge->execute();
+    $badgeResult = $stmtBadge->get_result();
+    $badge = $badgeResult->fetch_assoc();
 
-    $admin = $_SESSION['admin'];
-    $action = "Suppression badge : " . $badgeRow['RFID'] . " (ID " . $id . ")";
+    $stmtDelete = $conn->prepare("
+        DELETE FROM Carte
+        WHERE idCarte = ?
+    ");
 
-    $log = $conn->prepare("INSERT INTO Admin_log (admin, action) VALUES (?, ?)");
-    $log->bind_param("ss", $admin, $action);
-    $log-> execute();
+    $stmtDelete->bind_param("i", $idCarte);
+    $stmtDelete->execute();
+
+    if ($badge) {
+        logAdmin(
+            $conn,
+            "Suppression badge ID : " . $badge['RFID'] . " (ID " . $idCarte . ")"
+        );
+    }
 
     header("Location: badges.php");
     exit();
 }
 
-// Suppression utilisateur
+
+// =====================================================
+// SUPPRESSION D'UN UTILISATEUR
+// =====================================================
+
 if (isset($_GET['deleteuser'])) {
 
-    $id = intval($_GET['deleteuser']);
+    $idUser = intval($_GET['deleteuser']);
 
-    $adminCount = $conn->query("SELECT COUNT(*) AS total FROM User WHERE SuperUser = 1")->fetch_assoc();
+    $adminCount = $conn->query("
+        SELECT COUNT(*) AS total
+        FROM User
+        WHERE SuperUser = 1
+    ")->fetch_assoc();
 
-    $userRoleCheck = $conn->prepare("SELECT SuperUser FROM User WHERE idUser = ?");
-    $userRoleCheck->bind_param("i", $id);
-    $userRoleCheck->execute();
-    $userRoleResult = $userRoleCheck->get_result();
-    $userRole = $userRoleResult->fetch_assoc();
+    $stmtRole = $conn->prepare("
+        SELECT SuperUser
+        FROM User
+        WHERE idUser = ?
+    ");
+
+    $stmtRole->bind_param("i", $idUser);
+    $stmtRole->execute();
+    $roleResult = $stmtRole->get_result();
+    $userRole = $roleResult->fetch_assoc();
 
     if ($userRole['SuperUser'] == 1 && $adminCount['total'] <= 1) {
+
         $_SESSION['message'] = "<p class='error'>Impossible de supprimer le dernier administrateur</p>";
+
         header("Location: badges.php");
         exit();
-    } else {
-
-    $userInfo = $conn->prepare("SELECT Nom, Prenom FROM User WHERE idUser = ?");
-    $userInfo->bind_param("i", $id);
-    $userInfo->execute();
-    $userResult = $userInfo->get_result();
-    $userRow = $userResult->fetch_assoc();
-
-    // Supprime les badges liés
-    $stmt = $conn->prepare("DELETE FROM Carte WHERE idUser = ?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-
-    // Supprime utilisateur
-    $stmt = $conn->prepare("DELETE FROM User WHERE idUser = ?");
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-
-    $admin = $_SESSION['admin'];
-    $action = "Suppression utilisateur : " . $userRow['Nom'] . " " . $userRow['Prenom'] . " (ID " . $id . ")";
-
-    $log = $conn->prepare("INSERT INTO Admin_log (admin, action) VALUES (?, ?)");
-    $log->bind_param("ss", $admin, $action);
-    $log->execute();
-
     }
+
+    $stmtUser = $conn->prepare("
+        SELECT Nom, Prenom
+        FROM User
+        WHERE idUser = ?
+    ");
+
+    $stmtUser->bind_param("i", $idUser);
+    $stmtUser->execute();
+    $userResult = $stmtUser->get_result();
+    $user = $userResult->fetch_assoc();
+
+    $stmtDeleteBadges = $conn->prepare("
+        DELETE FROM Carte
+        WHERE idUser = ?
+    ");
+
+    $stmtDeleteBadges->bind_param("i", $idUser);
+    $stmtDeleteBadges->execute();
+
+    $stmtDeleteUser = $conn->prepare("
+        DELETE FROM User
+        WHERE idUser = ?
+    ");
+
+    $stmtDeleteUser->bind_param("i", $idUser);
+    $stmtDeleteUser->execute();
+
+    if ($user) {
+        logAdmin(
+            $conn,
+            "Suppression utilisateur : " . $user['Nom'] . " " . $user['Prenom'] . " (ID " . $idUser . ")"
+        );
+    }
+
     header("Location: badges.php");
     exit();
 }
 
 
-// Récupération badges
-$result = $conn->query("
-SELECT
-    Carte.*,
-    User.Nom,
-    User.Prenom,
-    User.Identifiant
-FROM Carte
-LEFT JOIN User ON Carte.idUser = User.idUser
+// =====================================================
+// RÉCUPÉRATION DES DONNÉES
+// =====================================================
+
+$users = $conn->query("
+    SELECT idUser, Nom, Prenom
+    FROM User
+    ORDER BY Nom
 ");
 
+$usersTable = $conn->query("
+    SELECT idUser, Nom, Prenom, Identifiant, SuperUser
+    FROM User
+    ORDER BY Nom
+");
+
+$badges = $conn->query("
+    SELECT
+        Carte.*,
+        User.Nom,
+        User.Prenom,
+        User.Identifiant
+    FROM Carte
+    LEFT JOIN User ON Carte.idUser = User.idUser
+");
 ?>
 
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestion des badges</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
 <img src="img/logo_ca25.png" class="background-logo">
+
 <div class="container">
 
-<h1>Gestion des badges</h1>
-<?php
-if (isset($_SESSION['message'])) {
-    echo $_SESSION['message'];
-    unset($_SESSION['message']);
-}
-?>
-<h3>Ajouter un badge</h3>
+    <h1>Gestion des badges</h1>
 
-<form method="post">
+    <?php
+    if (isset($_SESSION['message'])) {
+        echo $_SESSION['message'];
+        unset($_SESSION['message']);
+    }
+    ?>
 
-    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
+    <!-- Formulaire d'ajout d'un badge RFID -->
+    <h3>Ajouter un badge</h3>
 
-    <input type="text" name="rfid" placeholder="UID RFID" required>
-    <select name="idUser" required>
-        <?php while ($user = $users->fetch_assoc()) { ?>
-            <option value="<?php echo $user["idUser"]; ?>">
-                <?php echo $user["Nom"]." ".$user["Prenom"]; ?>
-            </option>
-        <?php } ?>
-    </select>
-
-    <button type="submit" name="add_badge">Ajouter</button>
-</form>
-
-<h3>Ajouter un utilisateur</h3>
-
-<form method="post">
-
-    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
-
-    <input type="text" name="nom" placeholder="Nom" required>
-    <input type="text" name="prenom" placeholder="Prénom" required>
-    <input type="email" name="email" placeholder="Email" required>
-    <button type="submit" name="add_user">Ajouter</button>
-</form>
-<br>
-
-<?php if ($_SESSION['role'] == 1) { ?>
-
-<h3>Créer un compte applicatif</h3>
-
-<form method="post">
-
-    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
-    <select name="idUser" required>
-        <option value="">Utilisateur associé</option>
-        <?php
-        $usersAccount = $conn->query("SELECT idUser, Nom, Prenom FROM User ORDER BY Nom");
-        while ($u = $usersAccount->fetch_assoc()) { ?>
-            <option value="<?php echo $u['idUser']; ?>">
-                <?php echo $u['Nom'] . " " . $u['Prenom']; ?>
-            </option>
-        <?php } ?>
-     <select>
-
-     <input type="text" name="identifiant" placeholder="Identifiant" required>
-     <input type="password" name="password" placeholder="Mot de passe temporaire" required>
-     <select name="role">
-         <option value="0">Utilisateur</option>
-         <option value="1">Administrateur</option>
-      </select>
-      <br><br>
-
-      <button type="submit" name="add_account">Créer compte</button>
-
-</form>
-
-<br>
-
-<?php } ?>
-
-<h3>Liste des badges</h3>
-
-<table class="table">
-<tr>
-    <th>ID</th>
-    <th>RFID</th>
-    <th>Utilisateur</th>
-    <th>Etat</th>
-    <th>Action</th>
-    <th>Supprimer</th>
-</tr>
-
-<?php while ($row = $result->fetch_assoc()) { ?>
-<tr>
-    <td><?php echo htmlspecialchars($row['idCarte']); ?></td>
-    <td><?php echo htmlspecialchars($row['RFID']); ?></td>
-
-    <td>
-        <?php
-        if (!empty($row['Nom'])) {
-            echo htmlspecialchars($row['Nom']." ".$row['Prenom']);
-        } else {
-            echo "Non assigné";
-        }
-        ?>
-    </td>
-
-    <td>
-        <?php
-        echo ($row["active"] == 1) ? "Actif" : "Inactif";
-        ?>
-    </td>
-
-    <td>
-        <?php
-        $lien = "badges.php?toggle=" . intval($row['idCarte']);
-        echo ($row["active"] == 1) ?  "<a href='$lien'>Désactiver</a>" : "<a href='$lien'>Activer</a>";
-        ?>
-    </td>
-
-    <td>
-        <a href="badges.php?delete=<?= intval($row["idCarte"]) ?>"onclick="return confirm('Supprimer ce badge ?');">Supprimer
-        </a>
-    </td>
-</tr>
-<?php } ?>
-
-</table>
-
-<h3>Liste des utilisateurs</h3>
-
-<table class="table">
-    <tr>
-        <th>ID</th>
-        <th>Nom</th>
-        <th>Prénom</th>
-        <th>Compte</th>
-        <th>Rôle</th>
-        <th>Modifier</th>
-        <th>Action</th>
-    </tr>
-
-<?php while($u = $usersTable->fetch_assoc()) { ?>
-
-<tr>
-    <td><?= htmlspecialchars($u['idUser']) ?></td>
-    <td><?= htmlspecialchars($u['Nom']) ?></td>
-    <td><?= htmlspecialchars($u['Prenom']) ?></td>
-    <td><?php echo !empty($u['Identifiant']) ? "Oui" : "Non"; ?></td>
-    <td><?php echo ($u['SuperUser'] == 1) ? "Administrateur" : "Utilisateur"; ?></td>
-    <td>
     <form method="post">
-    <input type="hidden" name="csrf_token" value="<?php echo generate_csrf_token(); ?>">
-    <input type="hidden" name="idUser" value="<?= $u['idUser'] ?>">
-    <select name="role">
-        <option value="0">Utilisateur</option>
-        <option value="1">administrateur</option>
-    </select>
+        <input type="hidden" name="csrf_token" value="<?= generate_csrf_token(); ?>">
 
-    <button type="submit" name="update_role">Modifier</button>
+        <input type="text" name="rfid" placeholder="UID RFID" required>
+
+        <select name="idUser" required>
+            <option value="">Utilisateur associé</option>
+
+            <?php while ($user = $users->fetch_assoc()) { ?>
+                <option value="<?= $user['idUser']; ?>">
+                    <?= htmlspecialchars($user['Nom'] . " " . $user['Prenom']); ?>
+                </option>
+            <?php } ?>
+        </select>
+
+        <button type="submit" name="add_badge">Ajouter</button>
     </form>
-    </td>
-    <td><a href="badges.php?deleteuser=<?= $u['idUser'] ?>"onclick="return confirm('Supprimer cet utilisateur et ses badges associés ?')">Supprimer
-        </a>
-    </td>
-</tr>
 
-<?php } ?>
+    <!-- Formulaire d'ajout d'un utilisateur -->
+    <h3>Ajouter un utilisateur</h3>
 
-</table>
-<br>
-<div style="text-align:center; margin-top:20px;">
-    <a href="dashboard.php" class="btn retour">Retour</a>
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="<?= generate_csrf_token(); ?>">
 
-</div>
+        <input type="text" name="nom" placeholder="Nom" required>
+        <input type="text" name="prenom" placeholder="Prénom" required>
+        <input type="email" name="email" placeholder="Email" required>
+
+        <button type="submit" name="add_user">Ajouter</button>
+    </form>
+
+    <?php if ($_SESSION['role'] == 1) { ?>
+
+        <!-- Formulaire de création d'un compte applicatif -->
+        <h3>Créer un compte applicatif</h3>
+
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="<?= generate_csrf_token(); ?>">
+
+            <select name="idUser" required>
+                <option value="">Utilisateur associé</option>
+
+                <?php
+                $usersAccount = $conn->query("
+                    SELECT idUser, Nom, Prenom
+                    FROM User
+                    ORDER BY Nom
+                ");
+
+                while ($user = $usersAccount->fetch_assoc()) {
+                ?>
+                    <option value="<?= $user['idUser']; ?>">
+                        <?= htmlspecialchars($user['Nom'] . " " . $user['Prenom']); ?>
+                    </option>
+                <?php } ?>
+            </select>
+
+            <input type="text" name="identifiant" placeholder="Identifiant" required>
+            <input type="password" name="password" placeholder="Mot de passe temporaire" required>
+
+            <select name="role">
+                <option value="0">Utilisateur</option>
+                <option value="1">Administrateur</option>
+            </select>
+
+            <button type="submit" name="add_account">Créer compte</button>
+        </form>
+
+    <?php } ?>
+
+    <!-- Tableau des badges RFID -->
+    <h3>Liste des badges</h3>
+
+    <table class="table">
+        <tr>
+            <th>ID</th>
+            <th>RFID</th>
+            <th>Utilisateur</th>
+            <th>État</th>
+            <th>Action</th>
+            <th>Supprimer</th>
+        </tr>
+
+        <?php while ($badge = $badges->fetch_assoc()) { ?>
+            <tr>
+                <td><?= htmlspecialchars($badge['idCarte']); ?></td>
+                <td><?= htmlspecialchars($badge['RFID']); ?></td>
+
+                <td>
+                    <?php
+                    if (!empty($badge['Nom'])) {
+                        echo htmlspecialchars($badge['Nom'] . " " . $badge['Prenom']);
+                    } else {
+                        echo "Non assigné";
+                    }
+                    ?>
+                </td>
+
+                <td>
+                    <?= ($badge['active'] == 1) ? "Actif" : "Inactif"; ?>
+                </td>
+
+                <td>
+                    <?php
+                    $toggleLink = "badges.php?toggle=" . intval($badge['idCarte']);
+
+                    if ($badge['active'] == 1) {
+                        echo "<a href='$toggleLink'>Désactiver</a>";
+                    } else {
+                        echo "<a href='$toggleLink'>Activer</a>";
+                    }
+                    ?>
+                </td>
+
+                <td>
+                    <a href="badges.php?delete=<?= intval($badge['idCarte']); ?>"
+                       onclick="return confirm('Supprimer ce badge ?');">
+                        Supprimer
+                    </a>
+                </td>
+            </tr>
+        <?php } ?>
+    </table>
+
+    <!-- Tableau des utilisateurs -->
+    <h3>Liste des utilisateurs</h3>
+
+    <table class="table">
+        <tr>
+            <th>ID</th>
+            <th>Nom</th>
+            <th>Prénom</th>
+            <th>Compte</th>
+            <th>Rôle</th>
+            <th>Modifier</th>
+            <th>Action</th>
+        </tr>
+
+        <?php while ($user = $usersTable->fetch_assoc()) { ?>
+            <tr>
+                <td><?= htmlspecialchars($user['idUser']); ?></td>
+                <td><?= htmlspecialchars($user['Nom']); ?></td>
+                <td><?= htmlspecialchars($user['Prenom']); ?></td>
+
+                <td>
+                    <?= !empty($user['Identifiant']) ? "Oui" : "Non"; ?>
+                </td>
+
+                <td>
+                    <?= ($user['SuperUser'] == 1) ? "Administrateur" : "Utilisateur"; ?>
+                </td>
+
+                <td>
+                    <form method="post">
+                        <input type="hidden" name="csrf_token" value="<?= generate_csrf_token(); ?>">
+                        <input type="hidden" name="idUser" value="<?= $user['idUser']; ?>">
+
+                        <select name="role">
+                            <option value="0" <?= ($user['SuperUser'] == 0) ? "selected" : ""; ?>>
+                                Utilisateur
+                            </option>
+                            <option value="1" <?= ($user['SuperUser'] == 1) ? "selected" : ""; ?>>
+                                Administrateur
+                            </option>
+                        </select>
+
+                        <button type="submit" name="update_role">Modifier</button>
+                    </form>
+                </td>
+
+                <td>
+                    <a href="badges.php?deleteuser=<?= $user['idUser']; ?>"
+                       onclick="return confirm('Supprimer cet utilisateur et ses badges associés ?');">
+                        Supprimer
+                    </a>
+                </td>
+            </tr>
+        <?php } ?>
+    </table>
+
+    <!-- Bouton de retour au tableau de bord -->
+    <br>
+    <div style="text-align:center; margin-top:20px;">
+        <a href="dashboard.php" class="btn retour">Retour</a>
+    </div>
 
 </div>
 
 <footer>
-CA25 - Application de gestion des badges RFID<br>
-BTS CIEL - Virginie R.
+    CA25 - Application de gestion des badges RFID<br>
+    BTS CIEL - Virginie R.
 </footer>
 
 </body>
