@@ -1,4 +1,16 @@
 <?php
+date_default_timezone_set('Europe/Paris');
+
+session_name("CA25SESSID");
+
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path' => '/',
+    'secure' => true,
+    'httponly' => true,
+    'samesite' => 'Strict'
+]);
+
 session_start();
 
 // Vérification session admin
@@ -42,14 +54,31 @@ if (isset($_GET["user"]) && $_GET["user"] != "") {
     $types .= "i";
 }
 
+if (isset($_GET["q"]) && trim($_GET["q"]) != "") {
+    $search = "%" . trim($_GET["q"]) . "%";
+    $where[] = "(Acces_log.UID LIKE ? OR User.Nom LIKE ? OR User.Prenom LIKE ?)";
+    $params[] = $search;
+    $params[] = $search;
+    $params[] = $search;
+    $types .= "sss";
+}
+
 $whereSQL = "";
 if (count($where) > 0) {
     $whereSQL = "WHERE " . implode("AND ", $where);
 }
 
+$limit =15;
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$offset = ($page - 1) * $limit;
+
 // Récupération des logs d'accès
 $sql = "SELECT Acces_log.*, User.Nom, User.Prenom FROM Acces_log LEFT JOIN User ON Acces_log.idUser = User.idUser
-        $whereSQL ORDER BY Acces_log.Date_heure_entree DESC";
+        $whereSQL ORDER BY Acces_log.Date_heure_entree DESC LIMIT ? OFFSET ?";
+
+$params[] = $limit;
+$params[] = $offset;
+$types .= "ii";
 
 $stmt = $conn->prepare($sql);
 
@@ -59,6 +88,9 @@ if (!empty($params)) {
 
 $stmt->execute();
 $result = $stmt->get_result();
+
+$prevPage = $page - 1;
+$nextPage = $page + 1;
 
 // Récupération des utilisateurs pour le filtre
 $users = $conn->query("SELECT idUser, Nom, Prenom FROM User ORDER BY Nom");
@@ -88,8 +120,16 @@ $users = $conn->query("SELECT idUser, Nom, Prenom FROM User ORDER BY Nom");
         <?php } ?>
     </select>
 
+    <input type="text" name="q" placeholder="Rechercher UID ou nom" value="<?php echo htmlspecialchars($_GET['q'] ?? ''); ?>">
+
     <button type="submit">Filtrer</button>
 </form>
+
+<div style="margin-top:15px; margin-bottom:25px; text-align:center;">
+    <button type="button" onclick="window.print()">Imprimer / Export PDF
+    </button>
+    <a href="export_logs_csv.php" class="btn">Export CSV</a>
+</div>
 
 <br>
 
@@ -107,7 +147,7 @@ $users = $conn->query("SELECT idUser, Nom, Prenom FROM User ORDER BY Nom");
 while ($row = $result->fetch_assoc()) {
     echo "<tr>";
     echo "<td>".htmlspecialchars($row["idAcces"])."</td>";
-    echo "<td>".htmlspecialchars($row["Date_heure_entree"])."</td>";
+    echo "<td>".date("d/m/Y H:i", strtotime($row["Date_heure_entree"]))."</td>";
 
     if ($row['Resultat_tentative'] == "ACCES_OK") {
     echo "<td class='success'>Accès autorisé</td>";
@@ -132,9 +172,24 @@ while ($row = $result->fetch_assoc()) {
 
 </table>
 <br>
-<a href="dashboard.php" class="btn retour">Retour</a>
+
+<?php
+$hasNextPage = $result->num_rows == $limit;
+?>
+<div style="margin-top:20px; text-align:center;">
+<?php if ($page > 1) { ?>
+    <a style="margin-right:20px;" href="?page=<?php echo $prevPage; ?>"><- Précédent</a>
+<?php } ?>
+
+<?php if ($hasNextPage) { ?>
+    <a style="margin-left:20px;" href="?page=<?php echo $nextPage; ?>">Suivant -></a>
+<?php } ?>
+</div>
+<div class="logs-action">
+    <a href="dashboard.php" class="btn retour">Retour</a>
+</div>
 </div>
 <footer>
-    <p>CA25 - Application de gestion des badges RFID</p>
-    <p>BTS CIEL - Virginie R.</p>
+CA25 - Application de gestion des badges RFID<br>
+BTS CIEL - Virginie R.
 </footer>
